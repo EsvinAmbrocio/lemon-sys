@@ -309,8 +309,12 @@ export async function seedDatabase() {
   const arList = []
   const cashList = []
 
-  // Generar ventas para los últimos 4 meses
+  // Multiplicadores de volumen por mes — crecimiento exponencial ~30%/mes
+  // mes -3 → × 0.40 | mes -2 → × 0.58 | mes -1 → × 0.82 | mes 0 → × 1.20
+  const volMultipliers = [0.40, 0.58, 0.82, 1.20]
+
   for (let m = 3; m >= 0; m--) {
+    const volMult = volMultipliers[3 - m]
     const monthStart = startOfMonth(subMonths(now, m))
     const monthEnd = m === 0 ? now : endOfMonth(subMonths(now, m))
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
@@ -318,34 +322,42 @@ export async function seedDatabase() {
 
     for (const day of saleDays) {
       const custId = customerIds[Math.floor(Math.random() * customerIds.length)]
-      const numItems = Math.floor(Math.random() * 4) + 1
+      const numItems = Math.floor(Math.random() * 4) + 2  // 2-5 líneas por pedido mayorista
       const items = []
       let subtotal = 0
       for (let i = 0; i < numItems; i++) {
         const pId = Math.floor(Math.random() * 15) + 1
         const presId = pId
-        const qty = (Math.floor(Math.random() * 5) + 1) * 5 // 5,10,15,20,25 cajas
+        // Qty base 100-300 cajas escalado por multiplicador de crecimiento
+        const baseQty = (Math.floor(Math.random() * 20) + 10) * 10
+        const qty = Math.max(10, Math.round(baseQty * volMult / 10) * 10)
         const unitPrice = products[pId - 1].baseSellPrice * (1 + Math.random() * 0.1)
         subtotal += qty * unitPrice
         items.push({ salesOrderId: salesId, productId: pId, presentationId: presId, quantity: qty, unitPrice: parseFloat(unitPrice.toFixed(2)), subtotal: parseFloat((qty * unitPrice).toFixed(2)) })
       }
       const discount = Math.random() > 0.7 ? parseFloat((subtotal * 0.05).toFixed(2)) : 0
       const taxBase = subtotal - discount
-      const tax = parseFloat((taxBase * 0.16).toFixed(2))
+      const tax = parseFloat((taxBase * 0.12).toFixed(2))
       const total = parseFloat((taxBase + tax).toFixed(2))
       const payType = custId <= 3 ? 'credito' : 'contado'
 
       salesList.push({ id: salesId, customerId: custId, status: 'completado', deliveryType: 'domicilio', date: day, userId: userSalesId, zoneId: Math.ceil(custId / 2), subtotal: parseFloat(subtotal.toFixed(2)), discount, tax, total, paymentType: payType, notes: '' })
       salesItemsList.push(...items)
 
-      invoicesList.push({ id: invoiceId, salesOrderId: salesId, customerId: custId, date: day, subtotal: parseFloat(subtotal.toFixed(2)), discount, tax, total, status: payType === 'contado' ? 'pagada' : (Math.random() > 0.4 ? 'pagada' : 'pendiente') })
+      // CxC: solo 45% se cobra (empresa cobra mal — 40% vencida aprox)
+      // dueDate extendido a 45 días (condiciones de crédito laxas, sin control)
+      const invStatus = payType === 'contado' ? 'pagada' : (Math.random() > 0.55 ? 'pagada' : 'pendiente')
+      invoicesList.push({ id: invoiceId, salesOrderId: salesId, customerId: custId, date: day, subtotal: parseFloat(subtotal.toFixed(2)), discount, tax, total, status: invStatus })
 
       if (payType === 'contado') {
         cashList.push({ id: cashId++, type: 'ingreso', refType: 'venta', refId: invoiceId, amount: total, date: day, description: `Venta contado cliente #${custId}` })
       } else {
-        const paid = invoicesList[invoicesList.length - 1].status === 'pagada'
-        arList.push({ id: arId++, invoiceId, customerId: custId, amount: total, dueDate: addDays(day, 30), paidAmount: paid ? total : 0, status: paid ? 'pagada' : (day < subDays(now, 5) ? 'vencida' : 'pendiente') })
-        if (paid) cashList.push({ id: cashId++, type: 'ingreso', refType: 'cxc', refId: arId - 1, amount: total, date: addDays(day, 15), description: `Cobro CxC cliente #${custId}` })
+        const paid = invStatus === 'pagada'
+        // Vencida si pasaron más de 10 días del dueDate (dueDate = día + 45)
+        const dueDate = addDays(day, 45)
+        const isOverdue = !paid && dueDate < subDays(now, 10)
+        arList.push({ id: arId++, invoiceId, customerId: custId, amount: total, dueDate, paidAmount: paid ? total : 0, status: paid ? 'pagada' : (isOverdue ? 'vencida' : 'pendiente') })
+        if (paid) cashList.push({ id: cashId++, type: 'ingreso', refType: 'cxc', refId: arId - 1, amount: total, date: addDays(day, 20), description: `Cobro CxC cliente #${custId}` })
       }
 
       salesId++
@@ -373,11 +385,13 @@ export async function seedDatabase() {
       let total = 0
       const items = []
       for (let i = 0; i < numItems; i++) {
-        const pId = Math.floor(Math.random() * 20) + 1
+        // Comprar solo insumos (ids 31-45, índices 30-44 en el array products)
+        const insumoIdx = Math.floor(Math.random() * 15) + 30  // índice 30-44
+        const pId = insumoIdx + 1  // productId 31-45
         const qty = (Math.floor(Math.random() * 10) + 5) * 10
-        const cost = products[pId - 1].buyPrice
+        const cost = products[insumoIdx].buyPrice
         total += qty * cost
-        items.push({ purchaseOrderId: poId, productId: pId, presentationId: pId, quantity: qty, unitCost: cost, subtotal: parseFloat((qty * cost).toFixed(2)) })
+        items.push({ purchaseOrderId: poId, productId: pId, presentationId: null, quantity: qty, unitCost: cost, subtotal: parseFloat((qty * cost).toFixed(2)) })
       }
       total = parseFloat(total.toFixed(2))
       const payType = suppId <= 3 ? 'credito' : 'contado'
@@ -386,7 +400,8 @@ export async function seedDatabase() {
       poItemsList.push(...items)
 
       if (payType === 'credito' && status === 'recibida') {
-        const paid = Math.random() > 0.4
+        // Solo 45% paga a tiempo — presión de caja por crecimiento
+        const paid = Math.random() > 0.55
         apList.push({ id: apId++, purchaseOrderId: poId, supplierId: suppId, amount: total, dueDate: addDays(d, 30), paidAmount: paid ? total : 0, status: paid ? 'pagada' : (d < subDays(now, 30) ? 'vencida' : 'pendiente') })
         if (paid) cashList.push({ id: cashId++, type: 'egreso', refType: 'cxp', refId: apId - 1, amount: total, date: addDays(d, 20), description: `Pago a proveedor #${suppId}` })
       } else if (payType === 'contado' && status === 'recibida') {
@@ -401,15 +416,54 @@ export async function seedDatabase() {
   await db.accountsPayable.bulkAdd(apList)
 
   // ─── EXPENSES ─────────────────────────────────────────────────
-  const expCategories = ['Renta', 'Transporte', 'Servicios', 'Sueldos', 'Mantenimiento']
-  const expAmounts    = [8500, 3200, 1800, 45000, 2500]
+  // Gastos escalando con el crecimiento + spikes bruscos por desorganización
+  // Sueldos crecen Q8k/mes (contrataciones sin planificación)
+  // Transporte escala por más rutas improvisadas
+  // Mantenimiento con spike en mes -2 (reparación urgente caldero)
+  // Mes 0: multa sanitaria Q5,500
   const expList = []
+
+  // mes -3: base, empresa aún pequeña
+  const exp_m3 = [
+    { category: 'Sueldos',        amount: 45000, description: 'Sueldos mes -3' },
+    { category: 'Renta',          amount: 8500,  description: 'Renta bodega mes -3' },
+    { category: 'Transporte',     amount: 3200,  description: 'Combustible y flete mes -3' },
+    { category: 'Mantenimiento',  amount: 2800,  description: 'Mantenimiento preventivo mes -3' },
+    { category: 'Servicios',      amount: 1750,  description: 'Servicios varios mes -3' },
+  ]
+  // mes -2: spike de mantenimiento — caldero roto, reparación de emergencia
+  const exp_m2 = [
+    { category: 'Sueldos',        amount: 53000,  description: 'Sueldos mes -2 (3 contrataciones nuevas)' },
+    { category: 'Renta',          amount: 8500,   description: 'Renta bodega mes -2' },
+    { category: 'Transporte',     amount: 4800,   description: 'Combustible + flete extra por demanda mes -2' },
+    { category: 'Mantenimiento',  amount: 14500,  description: 'Reparación urgente caldero industrial ⚠️' },
+    { category: 'Servicios',      amount: 2100,   description: 'Servicios varios mes -2' },
+  ]
+  // mes -1: spike en sueldos (horas extra), transporte sube fuerte
+  const exp_m1 = [
+    { category: 'Sueldos',        amount: 61000,  description: 'Sueldos mes -1 + horas extra producción ⚠️' },
+    { category: 'Renta',          amount: 8500,   description: 'Renta bodega mes -1' },
+    { category: 'Transporte',     amount: 6200,   description: 'Flete urgente + rutas extra mes -1' },
+    { category: 'Mantenimiento',  amount: 3200,   description: 'Mantenimiento mes -1' },
+    { category: 'Servicios',      amount: 1900,   description: 'Servicios varios mes -1' },
+  ]
+  // mes 0: sueldos siguen subiendo, multa sanitaria, transporte al máximo
+  const exp_m0 = [
+    { category: 'Sueldos',        amount: 69000,  description: 'Sueldos mes actual (equipo en crecimiento)' },
+    { category: 'Renta',          amount: 8500,   description: 'Renta bodega mes actual' },
+    { category: 'Transporte',     amount: 8500,   description: 'Transporte mes actual — rutas no optimizadas ⚠️' },
+    { category: 'Mantenimiento',  amount: 4800,   description: 'Mantenimiento correctivo mes actual' },
+    { category: 'Servicios',      amount: 2200,   description: 'Servicios varios mes actual' },
+    { category: 'Multas',         amount: 5500,   description: 'Multa inspección sanitaria ⚠️ — área producción sin orden' },
+  ]
+
+  const expByMonth = [exp_m3, exp_m2, exp_m1, exp_m0]
   for (let m = 3; m >= 0; m--) {
-    for (let c = 0; c < expCategories.length; c++) {
+    const exps = expByMonth[3 - m]
+    for (const e of exps) {
       const d = subDays(subMonths(now, m), 1)
-      const amt = expAmounts[c] + (Math.random() * 500 - 250)
-      expList.push({ category: expCategories[c], amount: parseFloat(amt.toFixed(2)), date: d, userId: 5, description: `${expCategories[c]} mes ${m === 0 ? 'actual' : m}` })
-      cashList.push({ id: cashId++, type: 'egreso', refType: 'gasto', refId: expList.length, amount: parseFloat(amt.toFixed(2)), date: d, description: expCategories[c] })
+      expList.push({ category: e.category, amount: e.amount, date: d, userId: 5, description: e.description })
+      cashList.push({ id: cashId++, type: 'egreso', refType: 'gasto', refId: expList.length, amount: e.amount, date: d, description: e.description })
     }
   }
   await db.expenses.bulkAdd(expList)
@@ -417,33 +471,50 @@ export async function seedDatabase() {
 
   // ─── TODAY DELIVERIES ─────────────────────────────────────────
   await db.salesOrders.bulkAdd([
-    { customerId: 1, status: 'en_ruta',    deliveryType: 'domicilio', date: now, userId: 4, zoneId: 1, subtotal: 4500, discount: 0, tax: 720, total: 5220, paymentType: 'credito', notes: 'Entregar antes del mediodía' },
-    { customerId: 3, status: 'preparando', deliveryType: 'domicilio', date: now, userId: 4, zoneId: 2, subtotal: 2800, discount: 140, tax: 425.6, total: 3085.6, paymentType: 'credito', notes: '' },
-    { customerId: 5, status: 'nuevo',      deliveryType: 'domicilio', date: now, userId: 4, zoneId: 4, subtotal: 1200, discount: 0, tax: 192, total: 1392, paymentType: 'contado', notes: 'Cliente nuevo' },
-    { customerId: 7, status: 'entregado',  deliveryType: 'domicilio', date: now, userId: 4, zoneId: 1, subtotal: 6800, discount: 340, tax: 1033.6, total: 7493.6, paymentType: 'credito', notes: '' },
-    { customerId: 4, status: 'nuevo',      deliveryType: 'bodega',    date: now, userId: 4, zoneId: 3, subtotal: 900,  discount: 0, tax: 144, total: 1044, paymentType: 'contado', notes: 'Retira en bodega' },
+    { customerId: 1, status: 'en_ruta',    deliveryType: 'domicilio', date: now, userId: 4, zoneId: 1, subtotal: 42500, discount: 0,    tax: 5100,  total: 47600,  paymentType: 'credito', notes: 'Entregar antes del mediodía' },
+    { customerId: 3, status: 'preparando', deliveryType: 'domicilio', date: now, userId: 4, zoneId: 2, subtotal: 31800, discount: 1590, tax: 3626.4, total: 33836.4, paymentType: 'credito', notes: '' },
+    { customerId: 5, status: 'nuevo',      deliveryType: 'domicilio', date: now, userId: 4, zoneId: 4, subtotal: 18500, discount: 0,    tax: 2220,  total: 20720,  paymentType: 'contado', notes: 'Cliente nuevo' },
+    { customerId: 7, status: 'entregado',  deliveryType: 'domicilio', date: now, userId: 4, zoneId: 1, subtotal: 56000, discount: 2800, tax: 6384,  total: 59584,  paymentType: 'credito', notes: '' },
+    { customerId: 4, status: 'nuevo',      deliveryType: 'bodega',    date: now, userId: 4, zoneId: 3, subtotal: 9800,  discount: 0,    tax: 1176,  total: 10976,  paymentType: 'contado', notes: 'Retira en bodega' },
   ])
 
   // ─── SERVICE INVOICES (Facturas de compra - Servicios) ───────
-  await db.serviceInvoices.bulkAdd([
-    { supplierId: null, supplierName: 'EEGSA',                  nit: '890101-0', invoiceNumber: 'F-2024-0010', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes 4 atrás', amount: 3850.00, tax: 462.00, total: 4312.00, date: monthsAgo(4), dueDate: addDays(monthsAgo(4), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'EMPAGUA',                 nit: '890202-0', invoiceNumber: 'F-2024-0022', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes 4 atrás',    amount: 1200.00, tax: 144.00, total: 1344.00, date: monthsAgo(4), dueDate: addDays(monthsAgo(4), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'Mantenimiento Industrial GT', nit: '1122334-5', invoiceNumber: 'F-2024-0035', serviceType: 'Mantenimiento',  description: 'Servicio mantenimiento maquinaria',     amount: 2500.00, tax: 300.00, total: 2800.00, date: monthsAgo(4), dueDate: addDays(monthsAgo(4), 30), status: 'pagada',   paymentType: 'credito' },
-    { supplierId: null, supplierName: 'EEGSA',                   nit: '890101-0', invoiceNumber: 'F-2024-0055', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes 3 atrás', amount: 4100.00, tax: 492.00, total: 4592.00, date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'EMPAGUA',                 nit: '890202-0', invoiceNumber: 'F-2024-0068', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes 3 atrás',    amount: 1350.00, tax: 162.00, total: 1512.00, date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'Limpieza Profesional S.A.', nit: '2233445-6', invoiceNumber: 'F-2024-0071', serviceType: 'Limpieza',         description: 'Servicio limpieza instalaciones',        amount: 1800.00, tax: 216.00, total: 2016.00, date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'Asesoría Fiscal GT',      nit: '3344556-7', invoiceNumber: 'F-2024-0090', serviceType: 'Asesoría Contable',  description: 'Honorarios contador mes 3',              amount: 3500.00, tax: 420.00, total: 3920.00, date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 30), status: 'pagada',   paymentType: 'credito' },
-    { supplierId: null, supplierName: 'EEGSA',                   nit: '890101-0', invoiceNumber: 'F-2024-0110', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes 2 atrás', amount: 3950.00, tax: 474.00, total: 4424.00, date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'EMPAGUA',                 nit: '890202-0', invoiceNumber: 'F-2024-0125', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes 2 atrás',    amount: 1280.00, tax: 153.60, total: 1433.60, date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'Reparaciones Técnicas GT',nit: '4455667-8', invoiceNumber: 'F-2024-0133', serviceType: 'Reparación',         description: 'Reparación compresor industrial',        amount: 6500.00, tax: 780.00, total: 7280.00, date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 30), status: 'pagada',   paymentType: 'credito' },
-    { supplierId: null, supplierName: 'Limpieza Profesional S.A.', nit: '2233445-6', invoiceNumber: 'F-2024-0140', serviceType: 'Limpieza',         description: 'Servicio limpieza instalaciones',        amount: 1800.00, tax: 216.00, total: 2016.00, date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'EEGSA',                   nit: '890101-0', invoiceNumber: 'F-2025-0010', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes anterior', amount: 4200.00, tax: 504.00, total: 4704.00, date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'EMPAGUA',                 nit: '890202-0', invoiceNumber: 'F-2025-0018', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes anterior',    amount: 1400.00, tax: 168.00, total: 1568.00, date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'Asesoría Fiscal GT',      nit: '3344556-7', invoiceNumber: 'F-2025-0025', serviceType: 'Asesoría Contable',  description: 'Honorarios contador mes anterior',        amount: 3500.00, tax: 420.00, total: 3920.00, date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 30), status: 'pendiente', paymentType: 'credito' },
-    { supplierId: null, supplierName: 'Limpieza Profesional S.A.', nit: '2233445-6', invoiceNumber: 'F-2025-0031', serviceType: 'Limpieza',         description: 'Servicio limpieza instalaciones',        amount: 1800.00, tax: 216.00, total: 2016.00, date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 15), status: 'pagada',   paymentType: 'contado' },
-    { supplierId: null, supplierName: 'Seguridad Privada GT',    nit: '5566778-9', invoiceNumber: 'F-2025-0040', serviceType: 'Seguridad',          description: 'Vigilancia mensual planta',               amount: 4500.00, tax: 540.00, total: 5040.00, date: daysAgo(5),   dueDate: addDays(daysAgo(5), 30),   status: 'pendiente', paymentType: 'credito' },
-    { supplierId: null, supplierName: 'EEGSA',                   nit: '890101-0', invoiceNumber: 'F-2025-0045', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes actual',   amount: 4050.00, tax: 486.00, total: 4536.00, date: daysAgo(3),   dueDate: addDays(daysAgo(3),  15),  status: 'pendiente', paymentType: 'contado' },
-  ])
+  // Electricidad crece ~18%/mes (maquinaria al límite por sobreproducción)
+  // Las facturas PAGADAS también se registran en cashMovements (corrección proceso)
+  const svcInvoices = [
+    // ── mes -4 ──
+    { supplierName: 'EEGSA',                     nit: '890101-0',  invoiceNumber: 'F-2024-0010', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes -4',         amount: 3850.00,  tax: 462.00,   total: 4312.00,  date: monthsAgo(4), dueDate: addDays(monthsAgo(4), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'EMPAGUA',                   nit: '890202-0',  invoiceNumber: 'F-2024-0022', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes -4',             amount: 1200.00,  tax: 144.00,   total: 1344.00,  date: monthsAgo(4), dueDate: addDays(monthsAgo(4), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'Mantenimiento Industrial GT',nit: '1122334-5', invoiceNumber: 'F-2024-0035', serviceType: 'Mantenimiento',       description: 'Servicio mantenimiento maquinaria – Mes -4',amount: 2500.00,  tax: 300.00,   total: 2800.00,  date: monthsAgo(4), dueDate: addDays(monthsAgo(4), 30), status: 'pagada',    paymentType: 'credito' },
+    // ── mes -3 ──
+    { supplierName: 'EEGSA',                     nit: '890101-0',  invoiceNumber: 'F-2024-0055', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes -3 (+18%)',   amount: 4550.00,  tax: 546.00,   total: 5096.00,  date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'EMPAGUA',                   nit: '890202-0',  invoiceNumber: 'F-2024-0068', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes -3',             amount: 1380.00,  tax: 165.60,   total: 1545.60,  date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'Limpieza Profesional S.A.', nit: '2233445-6', invoiceNumber: 'F-2024-0071', serviceType: 'Limpieza',            description: 'Servicio limpieza instalaciones – Mes -3',  amount: 1800.00,  tax: 216.00,   total: 2016.00,  date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'Asesoría Fiscal GT',        nit: '3344556-7', invoiceNumber: 'F-2024-0090', serviceType: 'Asesoría Contable',   description: 'Honorarios contador mes -3',                amount: 3500.00,  tax: 420.00,   total: 3920.00,  date: monthsAgo(3), dueDate: addDays(monthsAgo(3), 30), status: 'pagada',    paymentType: 'credito' },
+    // ── mes -2: spike eléctrico + reparación extra ──
+    { supplierName: 'EEGSA',                     nit: '890101-0',  invoiceNumber: 'F-2024-0110', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes -2 (+18%)',   amount: 5370.00,  tax: 644.40,   total: 6014.40,  date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'EMPAGUA',                   nit: '890202-0',  invoiceNumber: 'F-2024-0125', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes -2',             amount: 1580.00,  tax: 189.60,   total: 1769.60,  date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'Reparaciones Técnicas GT',  nit: '4455667-8', invoiceNumber: 'F-2024-0133', serviceType: 'Reparación',          description: 'Reparación compresor industrial ⚠️ emergencia',amount:6500.00, tax: 780.00,   total: 7280.00,  date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 30), status: 'pagada',    paymentType: 'credito' },
+    { supplierName: 'Limpieza Profesional S.A.', nit: '2233445-6', invoiceNumber: 'F-2024-0140', serviceType: 'Limpieza',            description: 'Servicio limpieza instalaciones – Mes -2',  amount: 1800.00,  tax: 216.00,   total: 2016.00,  date: monthsAgo(2), dueDate: addDays(monthsAgo(2), 15), status: 'pagada',    paymentType: 'contado' },
+    // ── mes -1: electricidad sigue subiendo, asesor sin pagar ──
+    { supplierName: 'EEGSA',                     nit: '890101-0',  invoiceNumber: 'F-2025-0010', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes -1 (+18%)',   amount: 6336.00,  tax: 760.32,   total: 7096.32,  date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'EMPAGUA',                   nit: '890202-0',  invoiceNumber: 'F-2025-0018', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes -1',             amount: 1820.00,  tax: 218.40,   total: 2038.40,  date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 15), status: 'pagada',    paymentType: 'contado' },
+    { supplierName: 'Asesoría Fiscal GT',        nit: '3344556-7', invoiceNumber: 'F-2025-0025', serviceType: 'Asesoría Contable',   description: 'Honorarios contador mes -1 — pendiente pago',amount: 3500.00,  tax: 420.00,   total: 3920.00,  date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 30), status: 'pendiente', paymentType: 'credito' },
+    { supplierName: 'Limpieza Profesional S.A.', nit: '2233445-6', invoiceNumber: 'F-2025-0031', serviceType: 'Limpieza',            description: 'Servicio limpieza instalaciones – Mes -1',  amount: 1800.00,  tax: 216.00,   total: 2016.00,  date: monthsAgo(1), dueDate: addDays(monthsAgo(1), 15), status: 'pagada',    paymentType: 'contado' },
+    // ── mes 0: electricidad dispara, todo pendiente (sin caja) ──
+    { supplierName: 'EEGSA',                     nit: '890101-0',  invoiceNumber: 'F-2025-0045', serviceType: 'Energía Eléctrica',  description: 'Consumo eléctrico planta – Mes actual (+18%) ⚠️', amount: 7476.00, tax: 897.12, total: 8373.12, date: daysAgo(3),   dueDate: addDays(daysAgo(3),  15), status: 'pendiente', paymentType: 'contado' },
+    { supplierName: 'EMPAGUA',                   nit: '890202-0',  invoiceNumber: 'F-2025-0052', serviceType: 'Agua Potable',        description: 'Servicio agua planta – Mes actual',         amount: 2100.00,  tax: 252.00,   total: 2352.00,  date: daysAgo(4),   dueDate: addDays(daysAgo(4),  15), status: 'pendiente', paymentType: 'contado' },
+    { supplierName: 'Seguridad Privada GT',      nit: '5566778-9', invoiceNumber: 'F-2025-0040', serviceType: 'Seguridad',           description: 'Vigilancia mensual planta',                 amount: 4500.00,  tax: 540.00,   total: 5040.00,  date: daysAgo(5),   dueDate: addDays(daysAgo(5),  30), status: 'pendiente', paymentType: 'credito' },
+    { supplierName: 'Asesoría Fiscal GT',        nit: '3344556-7', invoiceNumber: 'F-2025-0058', serviceType: 'Asesoría Contable',   description: 'Honorarios contador mes actual — sin pagar', amount: 3500.00,  tax: 420.00,   total: 3920.00,  date: daysAgo(2),   dueDate: addDays(daysAgo(2),  30), status: 'pendiente', paymentType: 'credito' },
+  ]
+  await db.serviceInvoices.bulkAdd(svcInvoices)
+
+  // Registrar en cashMovements las facturas de servicios PAGADAS (corrección de proceso)
+  for (const sv of svcInvoices) {
+    if (sv.status === 'pagada') {
+      cashList.push({ id: cashId++, type: 'egreso', refType: 'servicio', refId: 0, amount: sv.amount, date: sv.dueDate, description: `${sv.serviceType} — ${sv.supplierName}` })
+    }
+  }
 
   // ─── RECIPES (Recetas de producción) ─────────────────────────
   // recipeId → productId (producto terminado)
@@ -548,6 +619,156 @@ export async function seedDatabase() {
     { productId:45, presentationId:null, lotNumber:'INS-140', entryDate:monthsAgo(4), expiryDate:daysFromNow(365), quantity:10,   available:7.5, purchaseOrderId:null },
   ])
 
+  // ─── STOCK MOVEMENTS (historial) ─────────────────────────────
+  // Generamos movimientos coherentes con los lotes ya insertados:
+  //   • 1 entrada por lote (al registrarlo)
+  //   • N salidas distribuidas en el tiempo para reflejar el stock consumido
+  //   • Ajustes ocasionales (merma, correcciones)
+  const stockMov = []
+
+  // Helper: reparte `consumed` unidades en up to `slots` salidas aleatorias dentro del rango de fechas
+  function spreadExits(productId, presentationId, batchLotNumber, batchId, consumed, entryDate, slots, userId) {
+    if (consumed <= 0) return
+    const spread = Math.min(slots, Math.ceil(consumed / 5))
+    let remaining = consumed
+    for (let s = 0; s < spread; s++) {
+      const isLast = s === spread - 1
+      const portion = isLast ? remaining : Math.round(consumed / spread * (0.8 + Math.random() * 0.4))
+      const take = Math.min(portion, remaining)
+      if (take <= 0) continue
+      const daysOffset = Math.floor((s / spread) * (now - entryDate) / 86400000)
+      stockMov.push({
+        productId, presentationId, batchId, type: 'salida',
+        quantity: take,
+        date: addDays(entryDate, daysOffset),
+        userId,
+        reference: `Venta/Pedido histórico`,
+      })
+      remaining -= take
+      if (remaining <= 0) break
+    }
+  }
+
+  // ── Productos de VENTA (ids 1-30) — lotes del seed ──
+  // Los batchIds asignados por Dexie serán 1..N en orden de inserción.
+  // Usamos los mismos índices del array batchData (base 1 = Dexie id)
+  const ventaBatches = [
+    // { batchId, productId, presentationId, entryDate, quantity, available }
+    { batchId:1,  productId:1,  presentationId:1,  entryDate:monthsAgo(4), qty:500,  avail:320 },
+    { batchId:2,  productId:1,  presentationId:1,  entryDate:monthsAgo(2), qty:400,  avail:280 },
+    { batchId:3,  productId:1,  presentationId:2,  entryDate:monthsAgo(3), qty:200,  avail:140 },
+    { batchId:4,  productId:2,  presentationId:3,  entryDate:monthsAgo(4), qty:600,  avail:80  },
+    { batchId:5,  productId:2,  presentationId:3,  entryDate:monthsAgo(1), qty:600,  avail:500 },
+    { batchId:6,  productId:2,  presentationId:4,  entryDate:monthsAgo(2), qty:300,  avail:210 },
+    { batchId:7,  productId:3,  presentationId:5,  entryDate:monthsAgo(3), qty:300,  avail:200 },
+    { batchId:8,  productId:3,  presentationId:6,  entryDate:monthsAgo(1), qty:150,  avail:130 },
+    { batchId:9,  productId:4,  presentationId:7,  entryDate:monthsAgo(2), qty:200,  avail:0   },
+    { batchId:10, productId:4,  presentationId:7,  entryDate:monthsAgo(1), qty:300,  avail:250 },
+    { batchId:11, productId:5,  presentationId:8,  entryDate:monthsAgo(2), qty:400,  avail:350 },
+    { batchId:12, productId:5,  presentationId:8,  entryDate:monthsAgo(1), qty:350,  avail:340 },
+    { batchId:13, productId:6,  presentationId:9,  entryDate:monthsAgo(3), qty:500,  avail:300 },
+    { batchId:14, productId:6,  presentationId:9,  entryDate:monthsAgo(1), qty:400,  avail:380 },
+    { batchId:15, productId:7,  presentationId:10, entryDate:monthsAgo(2), qty:300,  avail:200 },
+    { batchId:16, productId:7,  presentationId:10, entryDate:monthsAgo(1), qty:400,  avail:390 },
+    { batchId:17, productId:8,  presentationId:11, entryDate:monthsAgo(2), qty:400,  avail:300 },
+    { batchId:18, productId:8,  presentationId:11, entryDate:monthsAgo(1), qty:350,  avail:320 },
+    { batchId:19, productId:8,  presentationId:12, entryDate:monthsAgo(1), qty:200,  avail:180 },
+    { batchId:20, productId:9,  presentationId:13, entryDate:monthsAgo(3), qty:600,  avail:150 },
+    { batchId:21, productId:9,  presentationId:13, entryDate:monthsAgo(1), qty:600,  avail:580 },
+    { batchId:22, productId:10, presentationId:14, entryDate:monthsAgo(2), qty:350,  avail:280 },
+    { batchId:23, productId:11, presentationId:15, entryDate:monthsAgo(2), qty:500,  avail:420 },
+    { batchId:24, productId:11, presentationId:15, entryDate:monthsAgo(1), qty:400,  avail:390 },
+    { batchId:25, productId:12, presentationId:16, entryDate:monthsAgo(3), qty:700,  avail:500 },
+    { batchId:26, productId:12, presentationId:16, entryDate:monthsAgo(1), qty:600,  avail:590 },
+    { batchId:27, productId:13, presentationId:17, entryDate:monthsAgo(2), qty:400,  avail:380 },
+    { batchId:28, productId:14, presentationId:18, entryDate:monthsAgo(4), qty:300,  avail:180 },
+    { batchId:29, productId:14, presentationId:18, entryDate:monthsAgo(1), qty:250,  avail:240 },
+    { batchId:30, productId:14, presentationId:19, entryDate:monthsAgo(2), qty:200,  avail:160 },
+    { batchId:31, productId:15, presentationId:20, entryDate:monthsAgo(2), qty:200,  avail:160 },
+    { batchId:32, productId:15, presentationId:20, entryDate:monthsAgo(1), qty:180,  avail:175 },
+    { batchId:33, productId:16, presentationId:21, entryDate:monthsAgo(3), qty:400,  avail:320 },
+    { batchId:34, productId:16, presentationId:21, entryDate:monthsAgo(1), qty:350,  avail:340 },
+    { batchId:35, productId:17, presentationId:22, entryDate:monthsAgo(2), qty:200,  avail:160 },
+    { batchId:36, productId:18, presentationId:23, entryDate:monthsAgo(2), qty:300,  avail:270 },
+    { batchId:37, productId:19, presentationId:24, entryDate:monthsAgo(1), qty:250,  avail:240 },
+    { batchId:38, productId:20, presentationId:25, entryDate:monthsAgo(2), qty:800,  avail:650 },
+    { batchId:39, productId:20, presentationId:25, entryDate:monthsAgo(1), qty:600,  avail:590 },
+    { batchId:40, productId:21, presentationId:26, entryDate:monthsAgo(2), qty:500,  avail:420 },
+    { batchId:41, productId:21, presentationId:26, entryDate:monthsAgo(1), qty:480,  avail:470 },
+    { batchId:42, productId:22, presentationId:27, entryDate:monthsAgo(1), qty:400,  avail:380 },
+    { batchId:43, productId:23, presentationId:28, entryDate:monthsAgo(2), qty:600,  avail:520 },
+    { batchId:44, productId:24, presentationId:29, entryDate:monthsAgo(1), qty:700,  avail:660 },
+    { batchId:45, productId:24, presentationId:29, entryDate:monthsAgo(3), qty:300,  avail:40  },
+    { batchId:46, productId:25, presentationId:30, entryDate:monthsAgo(2), qty:500,  avail:420 },
+    { batchId:47, productId:25, presentationId:30, entryDate:monthsAgo(1), qty:450,  avail:440 },
+    { batchId:48, productId:26, presentationId:31, entryDate:monthsAgo(2), qty:450,  avail:380 },
+    { batchId:49, productId:27, presentationId:32, entryDate:monthsAgo(1), qty:400,  avail:370 },
+    { batchId:50, productId:27, presentationId:32, entryDate:monthsAgo(3), qty:200,  avail:60  },
+    { batchId:51, productId:28, presentationId:33, entryDate:monthsAgo(1), qty:350,  avail:310 },
+    { batchId:52, productId:29, presentationId:34, entryDate:monthsAgo(2), qty:300,  avail:250 },
+    { batchId:53, productId:30, presentationId:35, entryDate:monthsAgo(1), qty:400,  avail:370 },
+    { batchId:54, productId:30, presentationId:35, entryDate:monthsAgo(2), qty:300,  avail:220 },
+  ]
+
+  // ── Insumos (ids 31-45) — lotes del seed ──
+  const insuBatches = [
+    { batchId:55, productId:31, presentationId:null, entryDate:monthsAgo(3), qty:500,  avail:180 },
+    { batchId:56, productId:31, presentationId:null, entryDate:monthsAgo(1), qty:800,  avail:650 },
+    { batchId:57, productId:31, presentationId:null, entryDate:daysAgo(5),   qty:600,  avail:600 },
+    { batchId:58, productId:32, presentationId:null, entryDate:monthsAgo(2), qty:300,  avail:120 },
+    { batchId:59, productId:32, presentationId:null, entryDate:daysAgo(10),  qty:400,  avail:400 },
+    { batchId:60, productId:33, presentationId:null, entryDate:monthsAgo(1), qty:100,  avail:75  },
+    { batchId:61, productId:34, presentationId:null, entryDate:monthsAgo(2), qty:150,  avail:110 },
+    { batchId:62, productId:35, presentationId:null, entryDate:monthsAgo(3), qty:1000, avail:620 },
+    { batchId:63, productId:35, presentationId:null, entryDate:monthsAgo(1), qty:1000, avail:990 },
+    { batchId:64, productId:36, presentationId:null, entryDate:monthsAgo(2), qty:200,  avail:145 },
+    { batchId:65, productId:37, presentationId:null, entryDate:monthsAgo(2), qty:500,  avail:320 },
+    { batchId:66, productId:38, presentationId:null, entryDate:monthsAgo(3), qty:50,   avail:38  },
+    { batchId:67, productId:39, presentationId:null, entryDate:monthsAgo(1), qty:2000, avail:1400},
+    { batchId:68, productId:39, presentationId:null, entryDate:daysAgo(3),   qty:2000, avail:2000},
+    { batchId:69, productId:40, presentationId:null, entryDate:monthsAgo(3), qty:5000, avail:2800},
+    { batchId:70, productId:40, presentationId:null, entryDate:monthsAgo(1), qty:5000, avail:4900},
+    { batchId:71, productId:41, presentationId:null, entryDate:monthsAgo(2), qty:2000, avail:1500},
+    { batchId:72, productId:42, presentationId:null, entryDate:monthsAgo(3), qty:1000, avail:680 },
+    { batchId:73, productId:43, presentationId:null, entryDate:monthsAgo(2), qty:3000, avail:2100},
+    { batchId:74, productId:44, presentationId:null, entryDate:monthsAgo(4), qty:20,   avail:14  },
+    { batchId:75, productId:45, presentationId:null, entryDate:monthsAgo(4), qty:10,   avail:7.5 },
+  ]
+
+  const allBatches = [...ventaBatches, ...insuBatches]
+
+  for (const b of allBatches) {
+    // 1. ENTRADA al registrar el lote
+    stockMov.push({
+      productId: b.productId,
+      presentationId: b.presentationId,
+      batchId: b.batchId,
+      type: 'entrada',
+      quantity: b.qty,
+      date: b.entryDate,
+      userId: 2,
+      reference: `Ingreso lote #${b.batchId}`,
+    })
+    // 2. SALIDAS proporcionales al consumo
+    const consumed = b.qty - b.avail
+    spreadExits(b.productId, b.presentationId, null, b.batchId, consumed, b.entryDate, 6, 4)
+  }
+
+  // 3. Ajustes manuales de inventario (mermas, correcciones) — varios meses
+  const ajustes = [
+    { productId:1,  presentationId:1,  batchId:1,  quantity:5,  date:monthsAgo(3), userId:2, reference:'Ajuste — rotura de envases' },
+    { productId:2,  presentationId:3,  batchId:4,  quantity:10, date:monthsAgo(2), userId:2, reference:'Ajuste — merma por vencimiento próximo' },
+    { productId:9,  presentationId:13, batchId:20, quantity:8,  date:monthsAgo(2), userId:2, reference:'Ajuste — devolución cliente' },
+    { productId:27, presentationId:32, batchId:50, quantity:12, date:monthsAgo(2), userId:2, reference:'Ajuste — merma almacén' },
+    { productId:31, presentationId:null, batchId:55, quantity:20, date:monthsAgo(2), userId:2, reference:'Ajuste — pérdida por humedad' },
+    { productId:35, presentationId:null, batchId:62, quantity:30, date:monthsAgo(1), userId:2, reference:'Ajuste — diferencia inventario físico' },
+  ]
+  for (const a of ajustes) {
+    stockMov.push({ ...a, type: 'ajuste' })
+  }
+
+  await db.stockMovements.bulkAdd(stockMov)
+
   // ─── PRODUCTION ORDERS (historial 4 meses) ────────────────────
   // Órdenes ejecutadas que consumieron insumos y generaron lotes de producto terminado
   // productionCost = suma de (qty_insumo × buyPrice_insumo) por receta
@@ -572,10 +793,13 @@ export async function seedDatabase() {
     { recipeId:5, productId:12, status:'completada', date:subDays(monthsAgo(1),6), userId:2, batchesProduced:3, unitsProduced:108, totalCost:186.30, notes:'' },
     { recipeId:7, productId:16, status:'completada', date:subDays(monthsAgo(1),10), userId:2, batchesProduced:3, unitsProduced:72, totalCost:619.20, notes:'' },
     // Mes actual
-    { recipeId:1, productId:1,  status:'completada', date:daysAgo(12), userId:2, batchesProduced:3, unitsProduced:72, totalCost:285.60, notes:'' },
-    { recipeId:4, productId:8,  status:'completada', date:daysAgo(8),  userId:2, batchesProduced:2, unitsProduced:40, totalCost:198.40, notes:'' },
-    { recipeId:6, productId:14, status:'completada', date:daysAgo(5),  userId:2, batchesProduced:2, unitsProduced:48, totalCost:318.00, notes:'' },
-    { recipeId:3, productId:3,  status:'en_proceso', date:daysAgo(1),  userId:2, batchesProduced:0, unitsProduced:0,  totalCost:0,      notes:'En planta — pendiente de finalizar' },
+    { recipeId:1, productId:1,  status:'completada', date:daysAgo(12), userId:2, batchesProduced:3, unitsProduced:72,  totalCost:285.60, notes:'' },
+    { recipeId:4, productId:8,  status:'completada', date:daysAgo(8),  userId:2, batchesProduced:2, unitsProduced:40,  totalCost:198.40, notes:'' },
+    { recipeId:6, productId:14, status:'completada', date:daysAgo(5),  userId:2, batchesProduced:2, unitsProduced:48,  totalCost:318.00, notes:'' },
+    { recipeId:3, productId:3,  status:'en_proceso', date:daysAgo(3),  userId:2, batchesProduced:0, unitsProduced:0,   totalCost:0,      notes:'⚠️ Lleva 3 días sin terminar — operario ausente' },
+    // Síntomas de desorganización
+    { recipeId:2, productId:2,  status:'cancelada',  date:subDays(monthsAgo(2),10), userId:2, batchesProduced:0, unitsProduced:0, totalCost:0, notes:'❌ Cancelada por falta de stock de Limón Criollo — compra no planificada' },
+    { recipeId:7, productId:16, status:'retrasada',  date:subDays(monthsAgo(1),15), userId:2, batchesProduced:1, unitsProduced:24, totalCost:206.40, notes:'⚠️ Retrasada — maquinaria en reparación, solo completó 50% del batch' },
   ]
   await db.productionOrders.bulkAdd(prodOrders)
 
