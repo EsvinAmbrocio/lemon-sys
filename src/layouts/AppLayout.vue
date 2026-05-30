@@ -2,56 +2,48 @@
   <v-app theme="lemonTheme">
     <!-- Navigation Drawer -->
     <v-navigation-drawer v-model="drawer" :rail="rail" permanent color="primary" class="lemon-drawer">
-      <!-- Logo -->
-      <div class="sidebar-logo pa-4 d-flex align-center" :class="rail ? 'justify-center' : ''">
-        <LemonLogo :size="rail ? 32 : 40" />
-        <Transition name="fade">
-          <div v-if="!rail" class="ml-3">
-            <div class="text-white font-weight-bold" style="font-size:15px; line-height:1.2">Lemon-Sys</div>
-            <div class="text-green-lighten-3" style="font-size:10px; line-height:1.2">Control y Distribución</div>
-          </div>
-        </Transition>
-      </div>
 
-      <v-divider color="rgba(255,255,255,0.2)" />
+      <!-- ── Cabecera fija: logo + usuario ── -->
+      <div class="sidebar-header">
+        <!-- Logo -->
+        <div class="pa-4 d-flex align-center" :class="rail ? 'justify-center' : ''">
+          <LemonLogo :size="rail ? 32 : 40" />
+          <Transition name="fade">
+            <div v-if="!rail" class="ml-3">
+              <div class="text-white font-weight-bold" style="font-size:15px; line-height:1.2">Lemon-Sys</div>
+              <div class="text-green-lighten-3" style="font-size:10px; line-height:1.2">Control y Distribución</div>
+            </div>
+          </Transition>
+        </div>
 
-      <!-- User chip -->
-      <div class="pa-3" v-if="!rail">
-        <v-chip color="rgba(255,255,255,0.15)" text-color="white" size="small" class="w-100" style="border-radius:8px">
-          <v-avatar color="white" size="22" class="mr-2">
+        <v-divider color="rgba(255,255,255,0.2)" />
+
+        <!-- User chip -->
+        <div class="px-3 py-2" v-if="!rail">
+          <v-chip color="rgba(255,255,255,0.15)" text-color="white" size="small" class="w-100" style="border-radius:8px">
+            <v-avatar color="white" size="22" class="mr-2">
+              <span class="text-primary font-weight-bold" style="font-size:11px">{{ userInitials }}</span>
+            </v-avatar>
+            <span class="text-white text-truncate" style="font-size:12px; max-width:110px">{{ auth.userName }}</span>
+            <v-spacer />
+            <v-chip color="accent" size="x-small" class="ml-1">{{ roleLabel }}</v-chip>
+          </v-chip>
+        </div>
+        <div class="px-3 py-2 d-flex justify-center" v-else>
+          <v-avatar color="white" size="28">
             <span class="text-primary font-weight-bold" style="font-size:11px">{{ userInitials }}</span>
           </v-avatar>
-          <span class="text-white text-truncate" style="font-size:12px; max-width:120px">{{ auth.userName }}</span>
-          <v-spacer />
-          <v-chip color="accent" size="x-small" class="ml-1">{{ roleLabel }}</v-chip>
-        </v-chip>
+        </div>
+
+        <v-divider color="rgba(255,255,255,0.2)" />
       </div>
 
-      <v-list density="compact" nav class="px-2">
-        <!-- Dashboard -->
-        <v-list-item
-          v-for="item in visibleNav"
-          :key="item.to"
-          :to="item.to"
-          :prepend-icon="item.icon"
-          :title="rail ? '' : item.title"
-          rounded="lg"
-          class="nav-item mb-1"
-          active-class="nav-item-active"
-        >
-          <template #append v-if="!rail && item.badge">
-            <v-badge :content="item.badge" color="error" inline />
-          </template>
-        </v-list-item>
-
-        <!-- Sections -->
-        <template v-for="section in visibleSections" :key="section.title">
-          <v-list-subheader v-if="!rail" class="text-green-lighten-3 mt-2 px-2" style="font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase">
-            {{ section.title }}
-          </v-list-subheader>
-          <v-divider v-else color="rgba(255,255,255,0.15)" class="my-1" />
+      <!-- ── Zona scrolleable de navegación ── -->
+      <div class="sidebar-nav-scroll">
+        <v-list density="compact" nav class="px-2 py-2">
+          <!-- Dashboard -->
           <v-list-item
-            v-for="item in section.items"
+            v-for="item in visibleNav"
             :key="item.to"
             :to="item.to"
             :prepend-icon="item.icon"
@@ -64,21 +56,45 @@
               <v-badge :content="item.badge" color="error" inline />
             </template>
           </v-list-item>
-        </template>
-      </v-list>
 
-      <template #append>
+          <!-- Sections -->
+          <template v-for="section in visibleSections" :key="section.title">
+            <v-list-subheader v-if="!rail" class="text-green-lighten-3 mt-2 px-2" style="font-size:10px; font-weight:600; letter-spacing:1px; text-transform:uppercase">
+              {{ section.title }}
+            </v-list-subheader>
+            <v-divider v-else color="rgba(255,255,255,0.15)" class="my-1" />
+            <v-list-item
+              v-for="item in section.items"
+              :key="item.to"
+              :to="item.to"
+              :prepend-icon="item.icon"
+              :title="rail ? '' : item.title"
+              rounded="lg"
+              class="nav-item mb-1"
+              active-class="nav-item-active"
+            >
+              <template #append v-if="!rail && item.badge">
+                <v-badge :content="item.badge" color="error" inline />
+              </template>
+            </v-list-item>
+          </template>
+        </v-list>
+      </div>
+
+      <!-- ── Pie fijo: cerrar sesión ── -->
+      <div class="sidebar-footer">
         <v-divider color="rgba(255,255,255,0.2)" />
         <div class="pa-2">
           <v-list-item
             prepend-icon="mdi-logout"
             :title="rail ? '' : 'Cerrar Sesión'"
             rounded="lg"
-            class="nav-item"
+            class="nav-item nav-item-logout"
             @click="handleLogout"
           />
         </div>
-      </template>
+      </div>
+
     </v-navigation-drawer>
 
     <!-- App Bar -->
@@ -138,8 +154,9 @@ const allSections = [
     roles: ['admin','produccion','logistica'],
     items: [
       { to: '/produccion/productos',   icon: 'mdi-package-variant',    title: 'Productos',   roles: ['admin','produccion'] },
-      { to: '/produccion/recetas',     icon: 'mdi-flask-outline',      title: 'Recetas',     roles: ['admin','produccion'] },
-      { to: '/produccion/lotes',       icon: 'mdi-layers-outline',     title: 'Lotes',       roles: ['admin','produccion'] },
+      { to: '/produccion/recetas',          icon: 'mdi-flask-outline',      title: 'Recetas',          roles: ['admin','produccion'] },
+      { to: '/produccion/orden-produccion', icon: 'mdi-cog-play-outline',   title: 'Órd. Producción',  roles: ['admin','produccion'] },
+      { to: '/produccion/lotes',            icon: 'mdi-layers-outline',     title: 'Lotes',            roles: ['admin','produccion'] },
       { to: '/produccion/inventario',  icon: 'mdi-warehouse',          title: 'Inventario',  roles: ['admin','produccion','logistica'] },
       { to: '/produccion/movimientos', icon: 'mdi-swap-horizontal',    title: 'Movimientos', roles: ['admin','produccion'] },
     ]
@@ -173,7 +190,8 @@ const allSections = [
       { to: '/finanzas/cxc',        icon: 'mdi-cash-plus',         title: 'Cuentas x Cobrar', roles: ['admin','finanzas'] },
       { to: '/finanzas/cxp',        icon: 'mdi-cash-minus',        title: 'Cuentas x Pagar',  roles: ['admin','finanzas'] },
       { to: '/finanzas/gastos',     icon: 'mdi-bank-minus',        title: 'Gastos',            roles: ['admin','finanzas'] },
-      { to: '/finanzas/flujo-caja', icon: 'mdi-chart-line',        title: 'Flujo de Caja',     roles: ['admin','finanzas'] },
+      { to: '/finanzas/flujo-caja',         icon: 'mdi-chart-line',        title: 'Flujo de Caja',     roles: ['admin','finanzas'] },
+      { to: '/finanzas/estado-resultados',  icon: 'mdi-file-chart-outline', title: 'Estado Resultados', roles: ['admin','finanzas'] },
     ]
   },
   {
@@ -204,6 +222,7 @@ const routeTitles = {
   '/produccion/lotes': 'Gestión de Lotes',
   '/produccion/inventario': 'Inventario',
   '/produccion/movimientos': 'Movimientos de Stock',
+  '/produccion/orden-produccion': 'Órdenes de Producción',
   '/logistica/proveedores': 'Proveedores',
   '/logistica/compras': 'Órdenes de Compra',
   '/logistica/facturas-compra': 'Facturas de Servicios',
@@ -218,6 +237,7 @@ const routeTitles = {
   '/finanzas/cxp': 'Cuentas por Pagar',
   '/finanzas/gastos': 'Gastos Operativos',
   '/finanzas/flujo-caja': 'Flujo de Caja',
+  '/finanzas/estado-resultados': 'Estado de Resultados',
   '/configuracion/usuarios': 'Usuarios del Sistema',
   '/configuracion/zonas': 'Zonas de Entrega',
   '/configuracion/catalogos': 'Catálogos',
@@ -232,10 +252,35 @@ function handleLogout() {
 
 <style scoped>
 .lemon-drawer { border-right: none !important; }
+
+/* Layout de 3 filas: header fijo + nav scroll + footer fijo */
+.lemon-drawer :deep(.v-navigation-drawer__content) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.sidebar-header { flex-shrink: 0; }
+.sidebar-nav-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+.sidebar-nav-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-nav-scroll::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+.sidebar-footer { flex-shrink: 0; }
+
+/* Items de nav */
 .nav-item { color: rgba(255,255,255,0.85) !important; }
 .nav-item:hover { background: rgba(255,255,255,0.12) !important; color: white !important; }
 .nav-item-active { background: rgba(255,255,255,0.2) !important; color: white !important; font-weight: 600 !important; }
-.sidebar-logo { min-height: 64px; }
+
+/* Logout más visible: tono rojizo al hover */
+.nav-item-logout:hover { background: rgba(239,83,80,0.25) !important; color: white !important; }
+
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

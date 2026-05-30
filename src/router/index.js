@@ -20,8 +20,9 @@ const routes = [
       { path: 'produccion/productos',    name: 'productos',    component: () => import('@/views/produccion/ProductosView.vue'),    meta: { roles: ['admin','produccion'] } },
       { path: 'produccion/recetas',      name: 'recetas',      component: () => import('@/views/produccion/RecetasView.vue'),      meta: { roles: ['admin','produccion'] } },
       { path: 'produccion/inventario',   name: 'inventario',   component: () => import('@/views/produccion/InventarioView.vue'),   meta: { roles: ['admin','produccion','logistica'] } },
-      { path: 'produccion/movimientos',  name: 'movimientos',  component: () => import('@/views/produccion/MovimientosView.vue'),  meta: { roles: ['admin','produccion'] } },
-      { path: 'produccion/lotes',        name: 'lotes',        component: () => import('@/views/produccion/LotesView.vue'),        meta: { roles: ['admin','produccion'] } },
+      { path: 'produccion/movimientos',     name: 'movimientos',     component: () => import('@/views/produccion/MovimientosView.vue'),     meta: { roles: ['admin','produccion'] } },
+      { path: 'produccion/lotes',           name: 'lotes',           component: () => import('@/views/produccion/LotesView.vue'),           meta: { roles: ['admin','produccion'] } },
+      { path: 'produccion/orden-produccion',name: 'orden-produccion',component: () => import('@/views/produccion/OrdenProduccionView.vue'), meta: { roles: ['admin','produccion'] } },
       // Logística
       { path: 'logistica/proveedores',   name: 'proveedores',  component: () => import('@/views/logistica/ProveedoresView.vue'),   meta: { roles: ['admin','logistica'] } },
       { path: 'logistica/compras',       name: 'compras',      component: () => import('@/views/logistica/OrdenesCompraView.vue'), meta: { roles: ['admin','logistica'] } },
@@ -39,6 +40,7 @@ const routes = [
       { path: 'finanzas/cxp',            name: 'cxp',          component: () => import('@/views/finanzas/CxPView.vue'),            meta: { roles: ['admin','finanzas'] } },
       { path: 'finanzas/gastos',         name: 'gastos',       component: () => import('@/views/finanzas/GastosView.vue'),         meta: { roles: ['admin','finanzas'] } },
       { path: 'finanzas/flujo-caja',     name: 'flujo-caja',   component: () => import('@/views/finanzas/FlujoCajaView.vue'),      meta: { roles: ['admin','finanzas'] } },
+      { path: 'finanzas/estado-resultados', name: 'estado-resultados', component: () => import('@/views/finanzas/EstadoResultadosView.vue'), meta: { roles: ['admin','finanzas'] } },
       // Configuración
       { path: 'configuracion/usuarios',  name: 'usuarios',     component: () => import('@/views/configuracion/UsuariosView.vue'),  meta: { roles: ['admin'] } },
       { path: 'configuracion/zonas',     name: 'zonas',        component: () => import('@/views/configuracion/ZonasView.vue'),     meta: { roles: ['admin'] } },

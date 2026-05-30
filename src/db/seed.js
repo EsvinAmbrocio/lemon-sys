@@ -506,4 +506,78 @@ export async function seedDatabase() {
     { recipeId: 8, inputProductId: 31, quantity: 0.2,  unit: 'kg',  notes: 'Limón Persa (jugo)' },
     { recipeId: 8, inputProductId: 35, quantity: 0.3,  unit: 'kg',  notes: 'Azúcar' },
   ])
+
+  // ─── LOTES DE INSUMOS (materias primas, ids 31-45) ───────────
+  // Sin presentaciones — se manejan por kg/L/pza directamente
+  await db.batches.bulkAdd([
+    // Limón Persa (31) — insumo estrella, varios lotes
+    { productId:31, presentationId:null, lotNumber:'INS-001', entryDate:monthsAgo(3), expiryDate:daysFromNow(30),  quantity:500,  available:180, purchaseOrderId:null },
+    { productId:31, presentationId:null, lotNumber:'INS-002', entryDate:monthsAgo(1), expiryDate:daysFromNow(60),  quantity:800,  available:650, purchaseOrderId:null },
+    { productId:31, presentationId:null, lotNumber:'INS-003', entryDate:daysAgo(5),   expiryDate:daysFromNow(55),  quantity:600,  available:600, purchaseOrderId:null },
+    // Limón Criollo (32)
+    { productId:32, presentationId:null, lotNumber:'INS-010', entryDate:monthsAgo(2), expiryDate:daysFromNow(45),  quantity:300,  available:120, purchaseOrderId:null },
+    { productId:32, presentationId:null, lotNumber:'INS-011', entryDate:daysAgo(10),  expiryDate:daysFromNow(50),  quantity:400,  available:400, purchaseOrderId:null },
+    // Jengibre (33)
+    { productId:33, presentationId:null, lotNumber:'INS-020', entryDate:monthsAgo(1), expiryDate:daysFromNow(90),  quantity:100,  available:75,  purchaseOrderId:null },
+    // Tamarindo (34)
+    { productId:34, presentationId:null, lotNumber:'INS-030', entryDate:monthsAgo(2), expiryDate:daysFromNow(180), quantity:150,  available:110, purchaseOrderId:null },
+    // Azúcar estándar (35)
+    { productId:35, presentationId:null, lotNumber:'INS-040', entryDate:monthsAgo(3), expiryDate:daysFromNow(365), quantity:1000, available:620, purchaseOrderId:null },
+    { productId:35, presentationId:null, lotNumber:'INS-041', entryDate:monthsAgo(1), expiryDate:daysFromNow(365), quantity:1000, available:990, purchaseOrderId:null },
+    // Azúcar glass (36)
+    { productId:36, presentationId:null, lotNumber:'INS-050', entryDate:monthsAgo(2), expiryDate:daysFromNow(365), quantity:200,  available:145, purchaseOrderId:null },
+    // Harina de trigo (37)
+    { productId:37, presentationId:null, lotNumber:'INS-060', entryDate:monthsAgo(2), expiryDate:daysFromNow(180), quantity:500,  available:320, purchaseOrderId:null },
+    // Grenetina (38)
+    { productId:38, presentationId:null, lotNumber:'INS-070', entryDate:monthsAgo(3), expiryDate:daysFromNow(365), quantity:50,   available:38,  purchaseOrderId:null },
+    // Agua purificada (39)
+    { productId:39, presentationId:null, lotNumber:'INS-080', entryDate:monthsAgo(1), expiryDate:daysFromNow(90),  quantity:2000, available:1400, purchaseOrderId:null },
+    { productId:39, presentationId:null, lotNumber:'INS-081', entryDate:daysAgo(3),   expiryDate:daysFromNow(90),  quantity:2000, available:2000, purchaseOrderId:null },
+    // Botella PET 500ml (40)
+    { productId:40, presentationId:null, lotNumber:'INS-090', entryDate:monthsAgo(3), expiryDate:daysFromNow(730), quantity:5000, available:2800, purchaseOrderId:null },
+    { productId:40, presentationId:null, lotNumber:'INS-091', entryDate:monthsAgo(1), expiryDate:daysFromNow(730), quantity:5000, available:4900, purchaseOrderId:null },
+    // Botella PET 1L (41)
+    { productId:41, presentationId:null, lotNumber:'INS-100', entryDate:monthsAgo(2), expiryDate:daysFromNow(730), quantity:2000, available:1500, purchaseOrderId:null },
+    // Frasco vidrio 250ml (42)
+    { productId:42, presentationId:null, lotNumber:'INS-110', entryDate:monthsAgo(3), expiryDate:daysFromNow(730), quantity:1000, available:680, purchaseOrderId:null },
+    // Bolsa sellable 100gr (43)
+    { productId:43, presentationId:null, lotNumber:'INS-120', entryDate:monthsAgo(2), expiryDate:daysFromNow(365), quantity:3000, available:2100, purchaseOrderId:null },
+    // Ácido cítrico (44)
+    { productId:44, presentationId:null, lotNumber:'INS-130', entryDate:monthsAgo(4), expiryDate:daysFromNow(365), quantity:20,   available:14,  purchaseOrderId:null },
+    // Conservante benzoato (45)
+    { productId:45, presentationId:null, lotNumber:'INS-140', entryDate:monthsAgo(4), expiryDate:daysFromNow(365), quantity:10,   available:7.5, purchaseOrderId:null },
+  ])
+
+  // ─── PRODUCTION ORDERS (historial 4 meses) ────────────────────
+  // Órdenes ejecutadas que consumieron insumos y generaron lotes de producto terminado
+  // productionCost = suma de (qty_insumo × buyPrice_insumo) por receta
+  const prodOrders = [
+    // Mes 4 atrás
+    { recipeId:1, productId:1,  status:'completada', date:monthsAgo(4), userId:2, batchesProduced:3, unitsProduced:72,  totalCost:285.60, notes:'Batch inicial temporada' },
+    { recipeId:4, productId:8,  status:'completada', date:monthsAgo(4), userId:2, batchesProduced:2, unitsProduced:40,  totalCost:198.40, notes:'' },
+    { recipeId:5, productId:12, status:'completada', date:subDays(monthsAgo(4),5), userId:2, batchesProduced:2, unitsProduced:72, totalCost:124.20, notes:'' },
+    // Mes 3 atrás
+    { recipeId:1, productId:1,  status:'completada', date:monthsAgo(3), userId:2, batchesProduced:4, unitsProduced:96,  totalCost:380.80, notes:'' },
+    { recipeId:2, productId:2,  status:'completada', date:monthsAgo(3), userId:2, batchesProduced:3, unitsProduced:72,  totalCost:242.40, notes:'' },
+    { recipeId:6, productId:14, status:'completada', date:subDays(monthsAgo(3),3), userId:2, batchesProduced:2, unitsProduced:48, totalCost:318.00, notes:'Mermelada temporada alta' },
+    { recipeId:7, productId:16, status:'completada', date:subDays(monthsAgo(3),7), userId:2, batchesProduced:2, unitsProduced:48, totalCost:412.80, notes:'' },
+    // Mes 2 atrás
+    { recipeId:1, productId:1,  status:'completada', date:monthsAgo(2), userId:2, batchesProduced:5, unitsProduced:120, totalCost:476.00, notes:'' },
+    { recipeId:3, productId:3,  status:'completada', date:monthsAgo(2), userId:2, batchesProduced:2, unitsProduced:48,  totalCost:398.40, notes:'Concentrado para exportación' },
+    { recipeId:4, productId:8,  status:'completada', date:subDays(monthsAgo(2),5), userId:2, batchesProduced:3, unitsProduced:60, totalCost:297.60, notes:'' },
+    { recipeId:8, productId:20, status:'completada', date:subDays(monthsAgo(2),8), userId:2, batchesProduced:2, unitsProduced:100, totalCost:89.50, notes:'' },
+    // Mes anterior
+    { recipeId:1, productId:1,  status:'completada', date:monthsAgo(1), userId:2, batchesProduced:5, unitsProduced:120, totalCost:476.00, notes:'' },
+    { recipeId:2, productId:2,  status:'completada', date:subDays(monthsAgo(1),3), userId:2, batchesProduced:4, unitsProduced:96, totalCost:323.20, notes:'' },
+    { recipeId:5, productId:12, status:'completada', date:subDays(monthsAgo(1),6), userId:2, batchesProduced:3, unitsProduced:108, totalCost:186.30, notes:'' },
+    { recipeId:7, productId:16, status:'completada', date:subDays(monthsAgo(1),10), userId:2, batchesProduced:3, unitsProduced:72, totalCost:619.20, notes:'' },
+    // Mes actual
+    { recipeId:1, productId:1,  status:'completada', date:daysAgo(12), userId:2, batchesProduced:3, unitsProduced:72, totalCost:285.60, notes:'' },
+    { recipeId:4, productId:8,  status:'completada', date:daysAgo(8),  userId:2, batchesProduced:2, unitsProduced:40, totalCost:198.40, notes:'' },
+    { recipeId:6, productId:14, status:'completada', date:daysAgo(5),  userId:2, batchesProduced:2, unitsProduced:48, totalCost:318.00, notes:'' },
+    { recipeId:3, productId:3,  status:'en_proceso', date:daysAgo(1),  userId:2, batchesProduced:0, unitsProduced:0,  totalCost:0,      notes:'En planta — pendiente de finalizar' },
+  ]
+  await db.productionOrders.bulkAdd(prodOrders)
+
+  console.log('✅ Lemon-Sys: Base de datos inicializada con datos de prueba')
 }

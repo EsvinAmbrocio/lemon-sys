@@ -49,6 +49,14 @@
             </v-row>
 
             <v-divider class="mb-4" />
+
+            <!-- Alerta de crédito vencido -->
+            <v-alert v-if="creditAlert" type="error" variant="tonal" density="compact" class="mb-4" icon="mdi-alert-circle">
+              <strong>Crédito vencido:</strong> Este cliente tiene {{ creditAlert.overdue }} factura(s) vencida(s) por un total de
+              <strong>Q{{ creditAlert.amount.toLocaleString('es-GT',{minimumFractionDigits:2}) }}</strong>.
+              No se puede generar un nuevo pedido hasta que regularice su cuenta.
+            </v-alert>
+
             <div class="d-flex align-center justify-space-between mb-3">
               <span class="font-weight-medium text-primary">Líneas de Productos</span>
               <v-btn size="small" color="primary" variant="tonal" prepend-icon="mdi-plus" @click="addLine">Agregar Producto</v-btn>
@@ -83,7 +91,7 @@
                       </td>
                       <td class="text-right text-error">- Q{{ (form.discount||0).toFixed(2) }}</td>
                     </tr>
-                    <tr><td class="text-medium-emphasis">IVA 16%</td><td class="text-right">Q{{ totals.tax.toFixed(2) }}</td></tr>
+                     <tr><td class="text-medium-emphasis">IVA 12%</td><td class="text-right">Q{{ totals.tax.toFixed(2) }}</td></tr>
                     <tr>
                       <td class="font-weight-bold text-primary text-h6">TOTAL</td>
                       <td class="text-right font-weight-bold text-primary text-h6">Q{{ totals.total.toFixed(2) }}</td>
@@ -98,7 +106,7 @@
         </v-card-text>
         <v-card-actions class="pa-6 pt-0">
           <v-spacer /><v-btn variant="text" @click="dialog=false">Cancelar</v-btn>
-          <v-btn color="primary" @click="saveOrder" :loading="saving">Confirmar Pedido y Facturar</v-btn>
+          <v-btn color="primary" @click="saveOrder" :loading="saving" :disabled="!!creditAlert">Confirmar Pedido y Facturar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -180,6 +188,7 @@ const formRef=ref(null); const snack=ref({show:false,text:'',color:'success'})
 const form=ref({customerId:null,deliveryType:'domicilio',discount:0,notes:'',lines:[]})
 const totals=ref({subtotal:0,discount:0,tax:0,total:0})
 const selectedCustomerData=ref(null)
+const creditAlert=ref(null)   // null | { overdue: number, amount: number }
 
 const headers=[
   {title:'#',key:'id',width:60},{title:'Cliente',key:'customerId'},{title:'Estado',key:'status',width:140},
@@ -219,13 +228,22 @@ async function load(){
 function openDialog(){
   form.value={customerId:null,deliveryType:'domicilio',discount:0,notes:'',lines:[]}
   selectedCustomerData.value=null
+  creditAlert.value=null
   totals.value={subtotal:0,discount:0,tax:0,total:0}
   dialog.value=true
 }
 
-function onCustomerChange(id){
+async function onCustomerChange(id){
   selectedCustomerData.value=customers.value.find(c=>c.id===id)||null
-  // Re-calcula precios con la lista del cliente
+  creditAlert.value=null
+  // Verificar CxC vencida
+  const cxcRows=await db.accountsReceivable.where('customerId').equals(id).toArray()
+  const today=new Date(); today.setHours(0,0,0,0)
+  const overdue=cxcRows.filter(r=>r.status==='pendiente'&&new Date(r.dueDate)<today)
+  if(overdue.length>0){
+    const amount=overdue.reduce((s,r)=>s+(r.amount-(r.paidAmount||0)),0)
+    creditAlert.value={overdue:overdue.length,amount}
+  }
   form.value.lines.forEach((_,i)=>calcLine(i))
 }
 
@@ -250,7 +268,7 @@ function calcTotals(){
   const sub=form.value.lines.reduce((s,l)=>s+(l.subtotal||0),0)
   const disc=form.value.discount||0
   const base=sub-disc
-  const tax=parseFloat((base*0.16).toFixed(2))
+  const tax=parseFloat((base*0.12).toFixed(2))
   totals.value={subtotal:parseFloat(sub.toFixed(2)),discount:disc,tax,total:parseFloat((base+tax).toFixed(2))}
 }
 function addLine(){form.value.lines.push({productId:null,presentationId:null,presOptions:[],quantity:1,unitPrice:0,subtotal:0})}

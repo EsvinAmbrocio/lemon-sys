@@ -2,7 +2,7 @@ import Dexie from 'dexie'
 
 export const db = new Dexie('LemonSysDB')
 
-db.version(2).stores({
+db.version(3).stores({
   users:               '++id, email, role, department, active',
   categories:          '++id, name, active',
   units:               '++id, name, abbr',
@@ -18,6 +18,8 @@ db.version(2).stores({
   serviceInvoices:     '++id, supplierId, invoiceNumber, serviceType, date, dueDate, status, paymentType',
   recipes:             '++id, productId, version, active',
   recipeItems:         '++id, recipeId, inputProductId, quantity, unit',
+  productionOrders:    '++id, recipeId, productId, status, date, userId',
+  productionOrderItems:'++id, productionOrderId, inputProductId, consumedBatchId, quantity, unitCost',
   customers:           '++id, name, nit, zoneId, priceListId, paymentType, active',
   salesOrders:         '++id, customerId, status, deliveryType, date, userId, zoneId',
   salesOrderItems:     '++id, salesOrderId, productId, presentationId',
