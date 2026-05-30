@@ -1,0 +1,66 @@
+# ── Dependencias ──────────────────────────────
+node_modules
+.pnp
+.pnp.js
+
+# ── Build ─────────────────────────────────────
+dist
+dist-ssr
+
+# ── Variables de entorno ───────────────────────
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ── Logs ──────────────────────────────────────
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Cache ─────────────────────────────────────
+.cache
+.parcel-cache
+.vite
+*.local
+
+# ── Editores ──────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Testing ───────────────────────────────────
+coverage
+*.lcov
+.nyc_output
+
+# ── TypeScript ────────────────────────────────
+*.tsbuildinfo
+
+# ── Misc ──────────────────────────────────────
+*.zip
+*.tar.gz

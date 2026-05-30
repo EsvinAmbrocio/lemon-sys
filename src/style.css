@@ -1,0 +1,138 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', sans-serif;
+  background-color: #F9FBE7;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F8E9;
+}
+::-webkit-scrollbar-thumb {
+  background: #A5D6A7;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #66BB6A;
+}
+
+/* ── Tour Driver.js ─────────────────────────────────────── */
+.lemon-tour-popover.driver-popover {
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18) !important;
+  padding: 0 !important;
+  min-width: 320px !important;
+  max-width: 400px !important;
+  border: none !important;
+}
+
+/* Franja verde superior */
+.lemon-tour-popover .driver-popover-title {
+  background: #2E7D32 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 15px !important;
+  padding: 16px 20px 14px !important;
+  margin: 0 !important;
+  border-radius: 16px 16px 0 0 !important;
+  line-height: 1.3 !important;
+}
+
+.lemon-tour-popover .driver-popover-description {
+  color: #455A64 !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  padding: 16px 20px !important;
+  margin: 0 !important;
+}
+
+.lemon-tour-popover .driver-popover-footer {
+  padding: 14px 20px 18px !important;
+  border-top: 1px solid #F1F8E9 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0 !important;
+}
+
+.lemon-tour-popover .driver-popover-progress-text {
+  color: #78909C !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  flex: 1 !important;
+  text-align: left !important;
+}
+
+/* Agrupa los botones a la derecha con espacio entre ellos */
+.lemon-tour-popover .driver-popover-navigation-btns {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.lemon-tour-popover .driver-popover-prev-btn {
+  background: transparent !important;
+  color: #2E7D32 !important;
+  border: 1px solid #A5D6A7 !important;
+  border-radius: 8px !important;
+  padding: 7px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+.lemon-tour-popover .driver-popover-prev-btn:hover {
+  background: #F1F8E9 !important;
+}
+
+.lemon-tour-popover .driver-popover-next-btn,
+.lemon-tour-popover .driver-popover-done-btn {
+  background: #2E7D32 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 7px 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+.lemon-tour-popover .driver-popover-next-btn:hover,
+.lemon-tour-popover .driver-popover-done-btn:hover {
+  background: #1B5E20 !important;
+}
+
+.lemon-tour-popover .driver-popover-close-btn {
+  position: absolute !important;
+  top: 12px !important;
+  right: 14px !important;
+  color: rgba(255,255,255,0.75) !important;
+  font-size: 18px !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+}
+.lemon-tour-popover .driver-popover-close-btn:hover {
+  color: #ffffff !important;
+}
+
+/* Flecha del popover */
+.lemon-tour-popover .driver-popover-arrow-side-top::before    { border-bottom-color: #2E7D32 !important; }
+.lemon-tour-popover .driver-popover-arrow-side-bottom::before { border-top-color: #ffffff !important; }
+.lemon-tour-popover .driver-popover-arrow-side-left::before   { border-right-color: #2E7D32 !important; }
+.lemon-tour-popover .driver-popover-arrow-side-right::before  { border-left-color: #2E7D32 !important; }
+
+/* Overlay más sutil */
+.driver-overlay {
+  background: rgba(0, 0, 0, 0.45) !important;
+}
